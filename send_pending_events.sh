@@ -95,9 +95,6 @@ def sendPendingEvent(url, data):
 	
 	try:
 		response = requests.post(url, headers=headers, data = data, verify=False, timeout=0.9)
-		#print "code:"+ str(response.status_code)
-		#print "headers:"+ str(response.headers)
-		#print "content:"+ str(response.text)
 		
 		if (response.status_code!=200):
 			logger.debug("Evento enviado: " + data)
@@ -124,6 +121,7 @@ def main():
 		logger.debug("sql: " + sql)
 		cur.execute(sql)
 		numrows = int(cur.rowcount)
+		logger.debug("Eventos a enviar: " + numrows)
 		if (numrows>0):
 			row = cur.fetchone()
 			eventId = row[0]
@@ -150,7 +148,7 @@ def main():
 				curUpdate.close()
 
 	except mdb.Error, e:
-		print "Error %d: %s" % (e.args[0], e.args[1])
+		logger.error ("Error %d: %s" % (e.args[0], e.args[1]))
 		sys.exit(1)
 
 	finally:
