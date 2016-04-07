@@ -18,7 +18,7 @@ import os
 import sys
 import calendar
 import logging, logging.handlers
-import json
+
 from threading import Thread
 import MySQLdb as mdb
 import requests
@@ -41,7 +41,6 @@ SENT_TIMEOUT = config['sent_timeout']
 
 DEFAULT_SLEEP_TIME = float(config['sleep_time'])
 
-PID = "/var/run/ais_dispatcher"
 ########################################################################
 
 # Se definen los logs internos que usaremos para comprobar errores
@@ -61,49 +60,36 @@ except:
 
 ########################################################################
 
-if os.access(os.path.expanduser(PID), os.F_OK):
-        print "Checking if send_pending_events process is already running..."
-        pidfile = open(os.path.expanduser(PID), "r")
-        pidfile.seek(0)
-        old_pd = pidfile.readline()
-        # process PID
-        if os.path.exists("/proc/%s" % old_pd) and old_pd!="":
-            print "You already have an instance of the send_pending_events process running"
-            print "It is running as process %s" % old_pd
-            sys.exit(1)
-        else:
-            print "Trying to start send_pending_events process..."
-            os.remove(os.path.expanduser(PID))
-
-#This is part of code where we put a PID file in the lock file
-pidfile = open(os.path.expanduser(PID), 'a')
-print "send_pending_events process started with PID: %s" % os.getpid()
-pidfile.write(str(os.getpid()))
-pidfile.close()
-
-########################################################################
 
 ########################################################################
 # Definicion de funciones
 #
 ########################################################################
 
-def sendPendingEvent(url, data):
-	#data = '{"eventType":40,"resourceId":7,"timestamp":"2016-04-05T18:05:42.00Z","source":"KYROS_API"}'
-	#url = 'https://bl.deimos-space.com/WebServicesWMS/rest/listener/notify'
-	headers = {"Content-type": "application/json", "X-Access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE1MjY5ODI1MDA1ODksImlzcyI6InN1bW8iLCJyb2xlIjoiYWRtaW5pc3RyYXRvciJ9.CnX6I1puC-H-0AluXge8X4vVlUOfv8x-Nh6VwzxO-n8"}
-	
+def sendPendingEventTest():
+	data = '{"eventType":40,"resourceId":7,"timestamp":"2016-04-05T18:05:42.00Z","source":"KYROS_API"}'
+	url = 'https://bl.deimos-space.com/WebServicesWMS/rest/listener/notify'
+	headers = {"Content-type": "application/json", "X-Access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE1MjY5ODI1MDA1ODksImlzcyI6InN1bW8iLCJyb2xlIjoiYWRtaW5pc3RyYXRvciJ9.CnX6I1puC-H-0AluXge8X4vVlUOfv8x-Nh6VwzxO-n8"}	
 	try:
-		response = requests.post(url, headers=headers, data = data, verify=False, timeout=0.9)
-		
-		if (response.status_code!=200):
+		response = requests.post(url, headers=headers, data = data, verify=False, timeout=2)
+		print "code:"+ str(response.status_code)
+		#print "headers:"+ str(response.headers)
+		#print "content:"+ str(response.text)
+	except:
+		print "Error al enviar evento"
+
+def sendPendingEvent(url, data):
+	headers = {"Content-type": "application/json", "X-Access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE1MjY5ODI1MDA1ODksImlzcyI6InN1bW8iLCJyb2xlIjoiYWRtaW5pc3RyYXRvciJ9.CnX6I1puC-H-0AluXge8X4vVlUOfv8x-Nh6VwzxO-n8"}	
+	try:
+		response = requests.post(url, headers=headers, data = data, verify=False, timeout=2)
+		if (response.status_code == 200):
 			logger.debug("Evento enviado: " + data)
 			return True
 		else:
+			logger.debug("Codigo de error al enviar el evento: " + response.status_code)
 			return False
 	except:
 		logger.debug("Error al enviar evento: " + data)
-
 
 ########################################################################
 # Funcion principal
@@ -116,12 +102,12 @@ def main():
 		con = mdb.connect(BBDD_HOST, BBDD_USERNAME, BBDD_PASSWORD, BBDD_NAME)
 		cur = con.cursor()
 
-		epoch_actual = calendar.timegm(time.gmtime())
-		sql = "SELECT ID, URL, EVENT_JSON_DATA, SENT FROM SUMO_PENDING_EVENT where LIMIT_DATE<" + str(epoch_actual) + " and SENT<" + str(MAX_RETRY)
+		epoch_actual = calendar.timegm(time.gmtime())*1000
+		sql = "SELECT ID, URL, EVENT_JSON_DATA, SENT FROM SUMO_PENDING_EVENT where LIMIT_DATE>" + str(epoch_actual) + " and SENT<" + str(MAX_RETRY)
 		logger.debug("sql: " + sql)
 		cur.execute(sql)
 		numrows = int(cur.rowcount)
-		logger.debug("Eventos a enviar: " + numrows)
+		logger.debug("Eventos a enviar: " + str(numrows))
 		if (numrows>0):
 			row = cur.fetchone()
 			eventId = row[0]
@@ -133,10 +119,10 @@ def main():
 			if sendPendingEvent(url, data):
 				#borrar el evento
 				curDelete = con.cursor()
-				sql = "DELETE FROM SUMO_PENDING_EVENT where ID=" + eventId
+				sql = "DELETE FROM SUMO_PENDING_EVENT where ID=" + str(eventId)
 				logger.debug("sql: " + sql)
-				curDelete.execute(sql)
-				con.commit()
+				#curDelete.execute(sql)
+				#con.commit()
 				curDelete.close()
 			else:
 				#incrementar el numero de intentos
@@ -157,4 +143,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-    #sendPendingEvent()
+    #sendPendingEventTest()
