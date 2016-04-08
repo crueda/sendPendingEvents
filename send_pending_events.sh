@@ -102,8 +102,9 @@ def main():
 		con = mdb.connect(BBDD_HOST, BBDD_USERNAME, BBDD_PASSWORD, BBDD_NAME)
 		cur = con.cursor()
 
-		epoch_actual = calendar.timegm(time.gmtime())*1000
-		sql = "SELECT ID, URL, EVENT_JSON_DATA, SENT FROM SUMO_PENDING_EVENT where LIMIT_DATE>" + str(epoch_actual) + " and SENT<" + str(MAX_RETRY)
+		actualUTC = long(datetime.datetime.utcnow().strftime('%s'))*1000
+		#sql = "SELECT ID, URL, EVENT_JSON_DATA, SENT FROM SUMO_PENDING_EVENT where LIMIT_DATE>" + str(actualUTC) + " and SENT<" + str(MAX_RETRY)
+		sql = "SELECT ID, URL, EVENT_JSON_DATA, SENT FROM SUMO_PENDING_EVENT where LIMIT_DATE>" + str(actualUTC) 
 		logger.debug("sql: " + sql)
 		cur.execute(sql)
 		numrows = int(cur.rowcount)
